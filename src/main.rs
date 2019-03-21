@@ -11,11 +11,9 @@ use clap::{App, Arg};
 fn main() {
 
     let matched_args = App::new("cargo build-deps")
+        .args_from_usage("-t, --target=[ARCH] 'Sets build target architecture'")
         .arg(Arg::with_name("build-deps"))
-        .arg(Arg::with_name("release").long("release"))
         .get_matches();
-
-    let is_release = matched_args.is_present("release");
 
     execute_command(Command::new("cargo").arg("update"));
 
@@ -28,9 +26,13 @@ fn main() {
     println!("building packages: {:?}", deps);
 
     for dep in deps {
-        build_package(&dep, is_release);
+        if matched_args.is_present("target") {
+            let target = matched_args.value_of("target").unwrap();
+            build_package(&dep, &target);
+        } else {
+            build_package(&dep, &"".to_owned());
+        }
     }
-
     println!("done");
 }
 
@@ -90,19 +92,21 @@ fn parse_deps<'a>(toml: &'a Toml, top_pkg_name: &str) -> Vec<String> {
     }
 }
 
-fn build_package(pkg_name: &str, is_release: bool) {
+fn build_package(pkg_name: &str, target: &str) {
     println!("building package: {:?}", pkg_name);
 
     let mut command = Command::new("cargo");
 
-    let command_with_args = command.arg("build").arg("-p").arg(pkg_name);
+    let command_with_args = command.arg("build");
 
-    let command_with_args_2 = if is_release {
-        command_with_args.arg("--release")
+    let command_with_args_2 = if target.len() > 0 {
+        command_with_args.arg("--target");
+        command_with_args.arg(target)
     } else {
         command_with_args
     };
 
+    command_with_args_2.arg("-p").arg(pkg_name);
     execute_command(command_with_args_2);
 }
 
